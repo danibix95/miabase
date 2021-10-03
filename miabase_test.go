@@ -1,0 +1,49 @@
+package miabase
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestMiaBase(t *testing.T) {
+	s := NewService()
+
+	t.Run("Add route to plugin", func(t *testing.T) {
+		// Add test handler
+		s.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header().Set("Content-Type", "application/json")
+			io.WriteString(rw, `{"msg": "welcome"}`)
+		})
+
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/greet", nil)
+		response := executeRequest(t, req, s)
+
+		require.Equal(t, http.StatusOK, response.Code, "Status codes mismatch")
+
+		expectedResponse := map[string]interface{}{"msg": "welcome"}
+		verifyJSONResponse(t, response, expectedResponse)
+	})
+}
+
+func executeRequest(t *testing.T, req *http.Request, s *Service) *httptest.ResponseRecorder {
+	t.Helper()
+
+	rr := httptest.NewRecorder()
+	s.Plugin.ServeHTTP(rr, req)
+
+	return rr
+}
+
+func verifyJSONResponse(t *testing.T, response *httptest.ResponseRecorder, expectedData interface{}) {
+	var jsonData map[string]interface{}
+
+	err := json.Unmarshal(response.Body.Bytes(), &jsonData)
+	require.NoError(t, err)
+	require.Equal(t, expectedData, jsonData)
+}

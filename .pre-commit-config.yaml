@@ -1,0 +1,28 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+fail_fast: true
+repos:
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.4.0
+    hooks:
+      - id: go-imports
+
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: v1.0.0-beta.4
+    hooks:
+      - id: go-mod-tidy
+      - id: golangci-lint-mod
+      - id: go-test-mod
+        args: [-timeout, 30s, -race, -failfast]
+        always_run: true
+      - id: go-build-mod
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-json
+      - id: check-yaml
+      - id: check-added-large-files
