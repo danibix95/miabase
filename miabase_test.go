@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +31,19 @@ func TestMiaBase(t *testing.T) {
 		expectedResponse := map[string]interface{}{"msg": "welcome"}
 		verifyJSONResponse(t, response, expectedResponse)
 	})
+}
+
+// TestServiceStart verify that the bare bone service
+// is able to start and to terminate gracefully
+func TestServiceStart(t *testing.T) {
+	s := NewService()
+
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		s.SignalReceiver <- syscall.SIGTERM
+	}()
+
+	s.Start()
 }
 
 func executeRequest(t *testing.T, req *http.Request, s *Service) *httptest.ResponseRecorder {

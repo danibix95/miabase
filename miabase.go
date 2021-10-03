@@ -1,7 +1,12 @@
 package miabase
 
 import (
+	"context"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
@@ -10,9 +15,10 @@ import (
 )
 
 type Service struct {
-	router *chi.Mux
-	Plugin *chi.Mux
-	Logger *zerolog.Logger
+	router         *chi.Mux
+	Plugin         *chi.Mux
+	Logger         *zerolog.Logger
+	SignalReceiver chan os.Signal
 }
 
 func NewService() *Service {
@@ -26,6 +32,8 @@ func NewService() *Service {
 	}
 	s.Logger = logger
 
+	s.SignalReceiver = make(chan os.Signal, 1)
+
 	return s
 }
 
@@ -37,6 +45,45 @@ func (s *Service) Start() {
 	})
 
 	server := &http.Server{Addr: "0.0.0.0:3000", Handler: s.router}
-	s.Logger.Info().Msg("Server listening on port :3000")
-	_ = server.ListenAndServe()
+
+	runWithGracefulShutdown(server, s.Logger, s.SignalReceiver)
+}
+
+func runWithGracefulShutdown(srv *http.Server, log *zerolog.Logger, sig chan os.Signal) {
+	// Server run context
+	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	// Listen for syscall signals for process to interrupt/quit
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sig
+
+		// Shutdown signal with grace period of 30 seconds
+		shutdownCtx, shutdownStopCtx := context.WithTimeout(serverCtx, 30*time.Second)
+
+		go func() {
+			<-shutdownCtx.Done()
+			if shutdownCtx.Err() == context.DeadlineExceeded {
+				log.Error().Msg("graceful shutdown timed out.. forcing exit")
+			}
+		}()
+
+		// Trigger graceful shutdown
+		err := srv.Shutdown(shutdownCtx)
+		if err != nil {
+			log.Fatal().Err(err).Msg("server shutdown did not work as expected")
+		}
+		serverStopCtx()
+		shutdownStopCtx()
+	}()
+
+	// Run the server
+	log.Info().Msg("server listening at http://localhost:3000")
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal().Err(err).Msg("server closed unexpectedly")
+	}
+
+	// Wait for server context to be stopped
+	<-serverCtx.Done()
 }
