@@ -3,13 +3,13 @@ package miabase
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/danibix95/miabase/pkg/response"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,9 +18,11 @@ func TestMiaBase(t *testing.T) {
 
 	t.Run("Add route to plugin", func(t *testing.T) {
 		// Add test handler
+		message := map[string]interface{}{"msg": "welcome"}
+
 		s.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
 			rw.Header().Set("Content-Type", "application/json")
-			io.WriteString(rw, `{"msg": "welcome"}`)
+			response.JSON(rw, message)
 		})
 
 		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/greet", nil)
@@ -28,7 +30,7 @@ func TestMiaBase(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, response.Code, "Status codes mismatch")
 
-		expectedResponse := map[string]interface{}{"msg": "welcome"}
+		expectedResponse := message
 		verifyJSONResponse(t, response, expectedResponse)
 	})
 }

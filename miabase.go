@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/danibix95/miabase/pkg/response"
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
 	"github.com/go-chi/chi/v5"
@@ -38,6 +39,8 @@ func NewService() *Service {
 }
 
 func (s *Service) Start() {
+	s.addErrorHandlers()
+
 	s.router.Group(func(r chi.Router) {
 		r.Use(zpstd.RequestLogger(s.Logger, []string{"/-/"}))
 
@@ -47,6 +50,11 @@ func (s *Service) Start() {
 	server := &http.Server{Addr: "0.0.0.0:3000", Handler: s.router}
 
 	runWithGracefulShutdown(server, s.Logger, s.SignalReceiver)
+}
+
+func (s *Service) addErrorHandlers() {
+	s.router.NotFound(response.NotFound)
+	s.router.MethodNotAllowed(response.MethodNotAllowed)
 }
 
 func runWithGracefulShutdown(srv *http.Server, log *zerolog.Logger, sig chan os.Signal) {
