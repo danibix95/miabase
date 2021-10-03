@@ -1,0 +1,33 @@
+name: Test and Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    strategy:
+      matrix:
+        go_version: [1.15, 1.16, 1.17]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go_version }}
+
+    - name: Go get dependencies
+      run: go get -v -t -d ./...
+
+    - name: Test
+      run: go test -v -race -cover ./...
+
+    - name: Build
+      if: matrix.go_version == 1.17
+      run: go build -v ./...
