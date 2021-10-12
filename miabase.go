@@ -13,6 +13,7 @@ import (
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 )
 
@@ -76,27 +77,29 @@ func (s *Service) addErrorsHandlers() {
 
 func (s *Service) addStatusRoutes() {
 	s.router.Group(func(r chi.Router) {
-		statusRouter := chi.NewRouter()
+		statusAndMetricsRouter := chi.NewRouter()
 
 		if s.HealthHandler != nil {
-			statusRouter.Get("/healthz", s.HealthHandler)
+			statusAndMetricsRouter.Get("/healthz", s.HealthHandler)
 		} else {
-			statusRouter.Get("/healthz", handlers.Health(s.Name, s.Version))
+			statusAndMetricsRouter.Get("/healthz", handlers.Health(s.Name, s.Version))
 		}
 
 		if s.ReadyHandler != nil {
-			statusRouter.Get("/ready", s.ReadyHandler)
+			statusAndMetricsRouter.Get("/ready", s.ReadyHandler)
 		} else {
-			statusRouter.Get("/ready", handlers.Ready(s.Name, s.Version))
+			statusAndMetricsRouter.Get("/ready", handlers.Ready(s.Name, s.Version))
 		}
 
 		if s.CheckupHandler != nil {
-			statusRouter.Get("/check-up", s.CheckupHandler)
+			statusAndMetricsRouter.Get("/check-up", s.CheckupHandler)
 		} else {
-			statusRouter.Get("/check-up", handlers.CheckUp(s.Name, s.Version))
+			statusAndMetricsRouter.Get("/check-up", handlers.CheckUp(s.Name, s.Version))
 		}
 
-		r.Mount("/-/", statusRouter)
+		statusAndMetricsRouter.Handle("/metrics", promhttp.Handler())
+
+		r.Mount("/-/", statusAndMetricsRouter)
 	})
 }
 
