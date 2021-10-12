@@ -11,7 +11,7 @@ func JSON(w http.ResponseWriter, body interface{}) {
 
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		if _, err := io.WriteString(w, `"msg":"error encoding response"`); err != nil {
+		if _, err := io.WriteString(w, `{"message":"error encoding response"}`); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}

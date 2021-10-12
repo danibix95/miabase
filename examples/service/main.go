@@ -11,7 +11,7 @@ func main() {
 	service := miabase.NewService()
 
 	service.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
-		response.JSON(rw, map[string]string{"msg": "welcome"})
+		response.JSON(rw, map[string]string{"message": "welcome"})
 	})
 
 	service.Start()

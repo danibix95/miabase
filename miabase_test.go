@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"syscall"
 	"testing"
 	"time"
 
@@ -14,11 +13,10 @@ import (
 )
 
 func TestMiaBase(t *testing.T) {
-	s := NewService()
-
 	t.Run("Add route to plugin", func(t *testing.T) {
+		s := NewService()
 		// Add test handler
-		message := map[string]interface{}{"msg": "welcome"}
+		message := map[string]interface{}{"message": "welcome"}
 
 		s.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
 			rw.Header().Set("Content-Type", "application/json")
@@ -35,14 +33,39 @@ func TestMiaBase(t *testing.T) {
 	})
 }
 
-// TestServiceStart verify that the bare bone service
+// TestPanicHandler verifies that a service
+// is able to handle panics returning Internal Server Error
+func TestPanicHandler(t *testing.T) {
+	t.Run("Handle panic correctly", func(t *testing.T) {
+		s := NewService()
+		s.Plugin.Get("/panic", func(rw http.ResponseWriter, r *http.Request) {
+			panic("it should not die")
+		})
+
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			s.Stop()
+		}()
+
+		s.Start()
+
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/panic", nil)
+
+		response := httptest.NewRecorder()
+		s.router.ServeHTTP(response, req)
+
+		require.Equal(t, http.StatusInternalServerError, response.Code, "Status codes mismatch")
+	})
+}
+
+// TestServiceStart verifies that the bare bone service
 // is able to start and to terminate gracefully
 func TestServiceStart(t *testing.T) {
 	s := NewService()
 
 	go func() {
-		time.Sleep(500 * time.Millisecond)
-		s.SignalReceiver <- syscall.SIGTERM
+		time.Sleep(300 * time.Millisecond)
+		s.Stop()
 	}()
 
 	s.Start()
@@ -52,7 +75,8 @@ func executeRequest(t *testing.T, req *http.Request, s *Service) *httptest.Respo
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	s.Plugin.ServeHTTP(rr, req)
+	s.router.Mount("/", s.Plugin)
+	s.router.ServeHTTP(rr, req)
 
 	return rr
 }

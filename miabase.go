@@ -19,7 +19,7 @@ type Service struct {
 	router         *chi.Mux
 	Plugin         *chi.Mux
 	Logger         *zerolog.Logger
-	SignalReceiver chan os.Signal
+	signalReceiver chan os.Signal
 }
 
 func NewService() *Service {
@@ -33,13 +33,15 @@ func NewService() *Service {
 	}
 	s.Logger = logger
 
-	s.SignalReceiver = make(chan os.Signal, 1)
+	s.signalReceiver = make(chan os.Signal, 1)
 
 	return s
 }
 
+// Start launch the configured service,
+// mounting customized plugin and starting the webserver
 func (s *Service) Start() {
-	s.addErrorHandlers()
+	s.addErrorsHandlers()
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(zpstd.RequestLogger(s.Logger, []string{"/-/"}))
@@ -49,10 +51,15 @@ func (s *Service) Start() {
 
 	server := &http.Server{Addr: "0.0.0.0:3000", Handler: s.router}
 
-	runWithGracefulShutdown(server, s.Logger, s.SignalReceiver)
+	runWithGracefulShutdown(server, s.Logger, s.signalReceiver)
 }
 
-func (s *Service) addErrorHandlers() {
+func (s *Service) Stop() {
+	s.signalReceiver <- syscall.SIGTERM
+}
+
+func (s *Service) addErrorsHandlers() {
+	s.router.Use(response.PanicManager)
 	s.router.NotFound(response.NotFound)
 	s.router.MethodNotAllowed(response.MethodNotAllowed)
 }
@@ -82,6 +89,7 @@ func runWithGracefulShutdown(srv *http.Server, log *zerolog.Logger, sig chan os.
 		if err != nil {
 			log.Fatal().Err(err).Msg("server shutdown did not work as expected")
 		}
+
 		serverStopCtx()
 		shutdownStopCtx()
 	}()
