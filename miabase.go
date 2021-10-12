@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/danibix95/miabase/pkg/handlers"
 	"github.com/danibix95/miabase/pkg/response"
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
@@ -16,16 +17,23 @@ import (
 )
 
 type Service struct {
+	Name           string
+	Version        string
 	router         *chi.Mux
 	Plugin         *chi.Mux
 	Logger         *zerolog.Logger
+	HealthHandler  http.HandlerFunc
+	ReadyHandler   http.HandlerFunc
+	CheckupHandler http.HandlerFunc
 	signalReceiver chan os.Signal
 }
 
-func NewService() *Service {
+func NewService(name, version string) *Service {
 	s := new(Service)
 	s.router = chi.NewRouter()
 	s.Plugin = chi.NewRouter()
+	s.Name = name
+	s.Version = version
 
 	logger, err := zeropino.Init(zeropino.InitOptions{Level: "info"})
 	if err != nil {
@@ -42,6 +50,8 @@ func NewService() *Service {
 // mounting customized plugin and starting the webserver
 func (s *Service) Start() {
 	s.addErrorsHandlers()
+
+	s.addStatusRoutes()
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(zpstd.RequestLogger(s.Logger, []string{"/-/"}))
@@ -62,6 +72,32 @@ func (s *Service) addErrorsHandlers() {
 	s.router.Use(response.PanicManager)
 	s.router.NotFound(response.NotFound)
 	s.router.MethodNotAllowed(response.MethodNotAllowed)
+}
+
+func (s *Service) addStatusRoutes() {
+	s.router.Group(func(r chi.Router) {
+		statusRouter := chi.NewRouter()
+
+		if s.HealthHandler != nil {
+			statusRouter.Get("/healthz", s.HealthHandler)
+		} else {
+			statusRouter.Get("/healthz", handlers.Health(s.Name, s.Version))
+		}
+
+		if s.ReadyHandler != nil {
+			statusRouter.Get("/ready", s.ReadyHandler)
+		} else {
+			statusRouter.Get("/ready", handlers.Ready(s.Name, s.Version))
+		}
+
+		if s.CheckupHandler != nil {
+			statusRouter.Get("/check-up", s.CheckupHandler)
+		} else {
+			statusRouter.Get("/check-up", handlers.CheckUp(s.Name, s.Version))
+		}
+
+		r.Mount("/-/", statusRouter)
+	})
 }
 
 func runWithGracefulShutdown(srv *http.Server, log *zerolog.Logger, sig chan os.Signal) {

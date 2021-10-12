@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	service := miabase.NewService()
+	service := miabase.NewService("example", "v0.0.1")
 
 	service.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
 		response.JSON(rw, map[string]string{"message": "welcome"})

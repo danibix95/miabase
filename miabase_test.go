@@ -3,6 +3,7 @@ package miabase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +15,7 @@ import (
 
 func TestMiaBase(t *testing.T) {
 	t.Run("Add route to plugin", func(t *testing.T) {
-		s := NewService()
+		s := NewService("", "")
 		// Add test handler
 		message := map[string]interface{}{"message": "welcome"}
 
@@ -37,7 +38,7 @@ func TestMiaBase(t *testing.T) {
 // is able to handle panics returning Internal Server Error
 func TestPanicHandler(t *testing.T) {
 	t.Run("Handle panic correctly", func(t *testing.T) {
-		s := NewService()
+		s := NewService("", "")
 		s.Plugin.Get("/panic", func(rw http.ResponseWriter, r *http.Request) {
 			panic("it should not die")
 		})
@@ -61,7 +62,7 @@ func TestPanicHandler(t *testing.T) {
 // TestServiceStart verifies that the bare bone service
 // is able to start and to terminate gracefully
 func TestServiceStart(t *testing.T) {
-	s := NewService()
+	s := NewService("test-service", "v0.0.1")
 
 	go func() {
 		time.Sleep(300 * time.Millisecond)
@@ -69,6 +70,22 @@ func TestServiceStart(t *testing.T) {
 	}()
 
 	s.Start()
+
+	statusRoutes := []string{"healthz", "ready", "check-up"}
+	expectedResponse := `{"name":"test-service","version":"v0.0.1","status":"OK"}
+`
+
+	for _, route := range statusRoutes {
+		t.Run(fmt.Sprintf("Test route %s", route), func(t *testing.T) {
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("/-/%s", route), nil)
+
+			response := httptest.NewRecorder()
+			s.router.ServeHTTP(response, req)
+
+			require.Equal(t, http.StatusOK, response.Code, "Status codes mismatch")
+			require.Equal(t, expectedResponse, response.Body.String(), "Status codes mismatch")
+		})
+	}
 }
 
 func executeRequest(t *testing.T, req *http.Request, s *Service) *httptest.ResponseRecorder {
