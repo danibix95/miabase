@@ -2,6 +2,7 @@ package miabase
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
 	"github.com/go-chi/chi/v5"
+	"github.com/mia-platform/configlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 )
@@ -29,14 +31,20 @@ type Service struct {
 	signalReceiver chan os.Signal
 }
 
-func NewService(name, version string) *Service {
+func LoadEnv(c []configlib.EnvConfig, env interface{}) {
+	if err := configlib.GetEnvVariables(c, &env); err != nil {
+		panic(err.Error())
+	}
+}
+
+func NewService(name, version, logLevel string) *Service {
 	s := new(Service)
 	s.router = chi.NewRouter()
 	s.Plugin = chi.NewRouter()
 	s.Name = name
 	s.Version = version
 
-	logger, err := zeropino.Init(zeropino.InitOptions{Level: "info"})
+	logger, err := zeropino.Init(zeropino.InitOptions{Level: logLevel})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -49,7 +57,7 @@ func NewService(name, version string) *Service {
 
 // Start launch the configured service,
 // mounting customized plugin and starting the webserver
-func (s *Service) Start() {
+func (s *Service) Start(httpPort int) {
 	s.addErrorsHandlers()
 
 	s.addStatusRoutes()
@@ -60,7 +68,7 @@ func (s *Service) Start() {
 		r.Mount("/", s.Plugin)
 	})
 
-	server := &http.Server{Addr: "0.0.0.0:3000", Handler: s.router}
+	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", httpPort), Handler: s.router}
 
 	runWithGracefulShutdown(server, s.Logger, s.signalReceiver)
 }
@@ -134,7 +142,7 @@ func runWithGracefulShutdown(srv *http.Server, log *zerolog.Logger, sig chan os.
 	}()
 
 	// Run the server
-	log.Info().Msg("server listening at http://localhost:3000")
+	log.Info().Msg(fmt.Sprintf("server listening at %s", srv.Addr))
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal().Err(err).Msg("server closed unexpectedly")
 	}

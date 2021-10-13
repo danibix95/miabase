@@ -13,9 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	httpPort = 3000
+	logLevel = "info"
+)
+
 func TestMiaBase(t *testing.T) {
 	t.Run("Add route to plugin", func(t *testing.T) {
-		s := NewService("", "")
+		s := NewService("", "", logLevel)
 		// Add test handler
 		message := map[string]interface{}{"message": "welcome"}
 
@@ -38,7 +43,7 @@ func TestMiaBase(t *testing.T) {
 // is able to handle panics returning Internal Server Error
 func TestPanicHandler(t *testing.T) {
 	t.Run("Handle panic correctly", func(t *testing.T) {
-		s := NewService("", "")
+		s := NewService("", "", logLevel)
 		s.Plugin.Get("/panic", func(rw http.ResponseWriter, r *http.Request) {
 			panic("it should not die")
 		})
@@ -48,7 +53,7 @@ func TestPanicHandler(t *testing.T) {
 			s.Stop()
 		}()
 
-		s.Start()
+		s.Start(httpPort)
 
 		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/panic", nil)
 
@@ -62,14 +67,14 @@ func TestPanicHandler(t *testing.T) {
 // TestServiceStart verifies that the bare bone service
 // is able to start and to terminate gracefully
 func TestServiceStart(t *testing.T) {
-	s := NewService("test-service", "v0.0.1")
+	s := NewService("test-service", "v0.0.1", logLevel)
 
 	go func() {
 		time.Sleep(300 * time.Millisecond)
 		s.Stop()
 	}()
 
-	s.Start()
+	s.Start(httpPort)
 
 	statusRoutes := []string{"healthz", "ready", "check-up"}
 	expectedResponse := `{"name":"test-service","version":"v0.0.1","status":"OK"}
