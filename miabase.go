@@ -23,7 +23,7 @@ type Service struct {
 	Name           string
 	Version        string
 	router         *chi.Mux
-	Plugin         *chi.Mux
+	plugins        []*Plugin
 	Logger         *zerolog.Logger
 	HealthHandler  http.HandlerFunc
 	ReadyHandler   http.HandlerFunc
@@ -40,7 +40,6 @@ func LoadEnv(c []configlib.EnvConfig, env interface{}) {
 func NewService(name, version, logLevel string) *Service {
 	s := new(Service)
 	s.router = chi.NewRouter()
-	s.Plugin = chi.NewRouter()
 	s.Name = name
 	s.Version = version
 
@@ -55,6 +54,10 @@ func NewService(name, version, logLevel string) *Service {
 	return s
 }
 
+func (s *Service) Register(plugin *Plugin) {
+	s.plugins = append(s.plugins, plugin)
+}
+
 // Start launch the configured service,
 // mounting customized plugin and starting the webserver
 func (s *Service) Start(httpPort int) {
@@ -65,7 +68,9 @@ func (s *Service) Start(httpPort int) {
 	s.router.Group(func(r chi.Router) {
 		r.Use(zpstd.RequestLogger(s.Logger, []string{"/-/"}))
 
-		r.Mount("/", s.Plugin)
+		for _, plugin := range s.plugins {
+			r.Mount(plugin.Path, plugin.router)
+		}
 	})
 
 	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", httpPort), Handler: s.router}

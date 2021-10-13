@@ -24,10 +24,13 @@ func TestMiaBase(t *testing.T) {
 		// Add test handler
 		message := map[string]interface{}{"message": "welcome"}
 
-		s.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
+		plugin := NewPlugin("/")
+		plugin.AddRoute("GET", "/greet", func(rw http.ResponseWriter, r *http.Request) {
 			rw.Header().Set("Content-Type", "application/json")
 			response.JSON(rw, message)
 		})
+
+		s.Register(plugin)
 
 		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/greet", nil)
 		response := executeRequest(t, req, s)
@@ -44,9 +47,13 @@ func TestMiaBase(t *testing.T) {
 func TestPanicHandler(t *testing.T) {
 	t.Run("Handle panic correctly", func(t *testing.T) {
 		s := NewService("", "", logLevel)
-		s.Plugin.Get("/panic", func(rw http.ResponseWriter, r *http.Request) {
+
+		plugin := NewPlugin("/")
+		plugin.AddRoute("GET", "/panic", func(rw http.ResponseWriter, r *http.Request) {
 			panic("it should not die")
 		})
+
+		s.Register(plugin)
 
 		go func() {
 			time.Sleep(300 * time.Millisecond)
@@ -97,7 +104,9 @@ func executeRequest(t *testing.T, req *http.Request, s *Service) *httptest.Respo
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	s.router.Mount("/", s.Plugin)
+	for _, plugin := range s.plugins {
+		s.router.Mount(plugin.Path, plugin.router)
+	}
 	s.router.ServeHTTP(rr, req)
 
 	return rr

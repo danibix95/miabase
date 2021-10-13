@@ -32,9 +32,12 @@ func main() {
 
 	service := miabase.NewService("example", "v0.0.1", env.LogLevel)
 
-	service.Plugin.Get("/greet", func(rw http.ResponseWriter, r *http.Request) {
+	plugin := miabase.NewPlugin("/")
+	plugin.AddRoute("GET", "/greet", func(rw http.ResponseWriter, r *http.Request) {
 		response.JSON(rw, map[string]string{"message": "welcome"})
 	})
+
+	service.Register(plugin)
 
 	service.Start(env.HTTPPort)
 }
