@@ -9,26 +9,30 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/danibix95/miabase/pkg/metrics"
 	"github.com/danibix95/miabase/pkg/response"
 	"github.com/danibix95/miabase/pkg/status"
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
 	"github.com/go-chi/chi/v5"
 	"github.com/mia-platform/configlib"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 )
 
 type Service struct {
-	name           string
-	version        string
-	router         *chi.Mux
-	plugins        []*Plugin
-	statusManager  status.Status
-	signalReceiver chan os.Signal
+	name            string
+	version         string
+	router          *chi.Mux
+	plugins         []*Plugin
+	statusManager   status.Status
+	signalReceiver  chan os.Signal
+	metricsRegistry *prometheus.Registry
+	metricsFactory  promauto.Factory
 	// Logger
 	Logger *zerolog.Logger
-	// MetricsFactory promauto.Factory
 }
 
 type ServiceOpts struct {
@@ -40,6 +44,8 @@ type ServiceOpts struct {
 	LogLevel string
 	// StatusManager is an interface providing the three status routes handlers
 	StatusManager status.Status
+	// MetricsManager is an interface providing a method to register custom metrics in the service registry
+	MetricsManager metrics.Metrics
 }
 
 func LoadEnv(c []configlib.EnvConfig, env interface{}) {
@@ -66,8 +72,11 @@ func NewService(opts ServiceOpts) *Service {
 		s.statusManager = opts.StatusManager
 	}
 
-	// s.MetricsFactory = metrics.InitializeMetrics()
-	// metrics.SetDefaultMetrics()
+	s.metricsRegistry, s.metricsFactory = metrics.InitializeMetrics(true)
+	metrics.SetRequestMetrics(s.metricsFactory)
+	if opts.MetricsManager != nil {
+		opts.MetricsManager.Register(s.metricsFactory)
+	}
 
 	s.signalReceiver = make(chan os.Signal, 1)
 
@@ -87,7 +96,7 @@ func (s *Service) Start(httpPort int) {
 	s.addStatusRoutes()
 
 	s.router.Group(func(r chi.Router) {
-		// r.Use(metrics.RequestsStatusMiddleware())
+		r.Use(metrics.RequestsStatusMiddleware())
 		r.Use(zpstd.RequestLogger(s.Logger, []string{"/-/"}))
 
 		for _, plugin := range s.plugins {
@@ -118,7 +127,7 @@ func (s *Service) addStatusRoutes() {
 		statusAndMetricsRouter.Get("/ready", s.statusManager.Ready(s.name, s.version))
 		statusAndMetricsRouter.Get("/check-up", s.statusManager.CheckUp(s.name, s.version))
 
-		statusAndMetricsRouter.Handle("/metrics", promhttp.Handler())
+		statusAndMetricsRouter.Handle("/metrics", promhttp.HandlerFor(s.metricsRegistry, promhttp.HandlerOpts{}))
 
 		r.Mount("/-/", statusAndMetricsRouter)
 	})

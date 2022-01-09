@@ -75,7 +75,7 @@ func TestPanicHandler(t *testing.T) {
 // TestServiceStart verifies that the bare bone service
 // is able to start and to terminate gracefully
 func TestServiceStart(t *testing.T) {
-	s := NewService(ServiceOpts{"test-service", "v0.0.1", logLevel, nil})
+	s := NewService(ServiceOpts{"test-service", "v0.0.1", logLevel, nil, nil})
 
 	go func() {
 		time.Sleep(300 * time.Millisecond)
