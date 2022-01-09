@@ -30,7 +30,12 @@ func main() {
 	var env Environment
 	miabase.LoadEnv(envVariablesConfig, &env)
 
-	service := miabase.NewService("example", "v0.0.1", env.LogLevel)
+	service := miabase.NewService(miabase.ServiceOpts{
+		Name:          "example",
+		Version:       "v0.0.1",
+		LogLevel:      env.LogLevel,
+		StatusManager: nil,
+	})
 
 	plugin := miabase.NewPlugin("/")
 	plugin.AddRoute("GET", "/greet", func(rw http.ResponseWriter, r *http.Request) {
