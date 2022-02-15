@@ -1,10 +1,13 @@
 package metrics
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,7 +43,7 @@ func TestInitializeMetrics(t *testing.T) {
 	})
 }
 
-func TestRequestMetrics(t *testing.T) {
+func TestSetRequestMetrics(t *testing.T) {
 	t.Run("verify default metrics are registered", func(t *testing.T) {
 		// check that pointers are nil before execution
 		require.Nil(t, requestDurationHistogram)
@@ -50,7 +53,7 @@ func TestRequestMetrics(t *testing.T) {
 		promFactory := promauto.With(reg)
 
 		require.NotPanics(t, func() {
-			SetRequestMetrics(promFactory)
+			setRequestMetrics(promFactory)
 		}, "metrics are registered correctly")
 
 		// an object has been assigned to the pointers
@@ -61,11 +64,33 @@ func TestRequestMetrics(t *testing.T) {
 			requestDurationHistogram.WithLabelValues("200", "GET", "/greetings").Observe(0.07)
 			requestDurationSummary.WithLabelValues("200", "GET", "/greetings").Observe(0.07)
 		}, "metrics can be employed to observe some values")
+
+		require.Equal(t, 1, testutil.CollectAndCount(requestDurationHistogram, "http_request_duration_seconds"))
+		require.Equal(t, 1, testutil.CollectAndCount(requestDurationSummary, "http_request_summary_seconds"))
 	})
 }
 
-func TestRequestMetricsMiddleware(t *testing.T) {
-	t.Run("", func(t *testing.T) {
+func TestRequestStatus(t *testing.T) {
+	t.Run("execute middleware to check that metrics were called once", func(t *testing.T) {
+		reg := prometheus.NewPedanticRegistry()
+		promFactory := promauto.With(reg)
 
+		middleware := RequestStatus(promFactory)
+
+		router := http.NewServeMux()
+		requestHandler := func(w http.ResponseWriter, req *http.Request) {
+			w.Write([]byte("thunderstorm"))
+		}
+
+		router.Handle("/", middleware(http.HandlerFunc(requestHandler)))
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
+
+		router.ServeHTTP(recorder, request)
+
+		require.Equal(t, http.StatusOK, recorder.Result().StatusCode)
+		require.Equal(t, 1, testutil.CollectAndCount(requestDurationHistogram, "http_request_duration_seconds"))
+		require.Equal(t, 1, testutil.CollectAndCount(requestDurationSummary, "http_request_summary_seconds"))
 	})
 }

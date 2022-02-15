@@ -39,7 +39,7 @@ func InitializeMetrics(enableDefaultCollectors bool) (*prometheus.Registry, prom
 }
 
 // SetRequestMetrics register a set of metrics usefult to monitor the requests that are performed to the service
-func SetRequestMetrics(pf promauto.Factory) {
+func setRequestMetrics(pf promauto.Factory) {
 	requestDurationHistogram = pf.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
@@ -58,11 +58,14 @@ func SetRequestMetrics(pf promauto.Factory) {
 	)
 }
 
-func RequestsStatusMiddleware() func(http.Handler) http.Handler {
+func RequestStatus(pf promauto.Factory) func(http.Handler) http.Handler {
+	setRequestMetrics(pf)
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			// default to status 200 to avoid empty values when WriteHeader to change the default status value 200 - OK
+			// default to status 200 to avoid empty values when WriteHeader
+			// is not called to change the default status value 200 - OK
 			httpResponse := httpResponseWriter{w, "200"}
 
 			next.ServeHTTP(httpResponse, r)

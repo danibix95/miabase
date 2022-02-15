@@ -31,7 +31,7 @@ type Service struct {
 	signalReceiver  chan os.Signal
 	metricsRegistry *prometheus.Registry
 	metricsFactory  promauto.Factory
-	// Logger
+	// Logger a zerolog instance that can be employed to log service details within plugins
 	Logger *zerolog.Logger
 }
 
@@ -73,7 +73,6 @@ func NewService(opts ServiceOpts) *Service {
 	}
 
 	s.metricsRegistry, s.metricsFactory = metrics.InitializeMetrics(true)
-	metrics.SetRequestMetrics(s.metricsFactory)
 	if opts.MetricsManager != nil {
 		opts.MetricsManager.Register(s.metricsFactory)
 	}
@@ -91,12 +90,11 @@ func (s *Service) Register(plugin *Plugin) {
 // Start launch the configured service,
 // mounting customized plugin and starting the webserver
 func (s *Service) Start(httpPort int) {
+	s.router.Use(metrics.RequestStatus(s.metricsFactory))
 	s.addErrorsHandlers()
-
 	s.addStatusRoutes()
 
 	s.router.Group(func(r chi.Router) {
-		r.Use(metrics.RequestsStatusMiddleware())
 		r.Use(zpstd.RequestLogger(s.Logger, []string{"/-/"}))
 
 		for _, plugin := range s.plugins {
