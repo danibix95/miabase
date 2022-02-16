@@ -11,20 +11,20 @@ type httpResponseWriter struct {
 	status string
 }
 
-func (hrw httpResponseWriter) Header() http.Header {
+func (hrw *httpResponseWriter) Header() http.Header {
 	return hrw.writer.Header()
 }
 
-func (hrw httpResponseWriter) Write(body []byte) (int, error) {
+func (hrw *httpResponseWriter) Write(body []byte) (int, error) {
 	return hrw.writer.Write(body)
 }
 
-func (hrw httpResponseWriter) WriteHeader(statusCode int) {
+func (hrw *httpResponseWriter) WriteHeader(statusCode int) {
 	hrw.status = strconv.Itoa(statusCode)
 	hrw.writer.WriteHeader(statusCode)
 }
 
-func (hrw httpResponseWriter) Flush() {
+func (hrw *httpResponseWriter) Flush() {
 	if f, ok := hrw.writer.(http.Flusher); ok {
 		f.Flush()
 	}

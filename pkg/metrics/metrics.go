@@ -68,7 +68,7 @@ func RequestStatus(pf promauto.Factory) func(http.Handler) http.Handler {
 			// is not called to change the default status value 200 - OK
 			httpResponse := httpResponseWriter{w, "200"}
 
-			next.ServeHTTP(httpResponse, r)
+			next.ServeHTTP(&httpResponse, r)
 
 			end := time.Since(start).Seconds()
 			requestDurationHistogram.

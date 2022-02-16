@@ -16,7 +16,6 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - golint
     - gosec
     - gosimple
     - govet
@@ -26,6 +25,7 @@ linters:
     - nakedret
     - noctx
     - nolintlint
+    - revive
     - rowserrcheck
     - staticcheck
     - structcheck
