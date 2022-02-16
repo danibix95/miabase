@@ -3,7 +3,7 @@ module github.com/danibix95/miabase
 go 1.17
 
 require (
-	github.com/danibix95/zeropino v0.3.0
+	github.com/danibix95/zeropino v0.3.1
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/mia-platform/configlib v1.0.0
 	github.com/prometheus/client_golang v1.12.1

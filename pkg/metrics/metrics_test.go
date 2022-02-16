@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -77,7 +78,7 @@ func TestRequestStatus(t *testing.T) {
 
 		middleware := RequestStatus(promFactory)
 
-		router := http.NewServeMux()
+		router := chi.NewMux()
 		requestHandler := func(w http.ResponseWriter, req *http.Request) {
 			w.Write([]byte("thunderstorm"))
 		}

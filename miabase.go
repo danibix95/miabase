@@ -90,8 +90,8 @@ func (s *Service) Register(plugin *Plugin) {
 // Start launch the configured service,
 // mounting customized plugin and starting the webserver
 func (s *Service) Start(httpPort int) {
-	s.router.Use(metrics.RequestStatus(s.metricsFactory))
 	s.addErrorsHandlers()
+	s.router.Use(metrics.RequestStatus(s.metricsFactory))
 	s.addStatusRoutes()
 
 	s.router.Group(func(r chi.Router) {

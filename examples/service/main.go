@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/danibix95/miabase"
 	"github.com/danibix95/miabase/pkg/response"
+	"github.com/go-chi/chi/v5"
 	"github.com/mia-platform/configlib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -63,6 +65,12 @@ func main() {
 		greetinsCounter.Inc()
 
 		response.JSON(rw, map[string]string{"message": "welcome"})
+	})
+
+	plugin.AddRoute("GET", "/ciaone/{who}", func(rw http.ResponseWriter, r *http.Request) {
+		who := chi.URLParam(r, "who")
+
+		response.JSON(rw, map[string]string{"message": fmt.Sprintf("ciaone %s", who)})
 	})
 
 	service.Register(plugin)

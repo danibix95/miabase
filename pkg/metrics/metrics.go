@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -63,6 +64,12 @@ func RequestStatus(pf promauto.Factory) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// avoid counting requests that does not belong to APIs
+			if r.Method == http.MethodConnect || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			start := time.Now()
 			// default to status 200 to avoid empty values when WriteHeader
 			// is not called to change the default status value 200 - OK
@@ -71,11 +78,15 @@ func RequestStatus(pf promauto.Factory) func(http.Handler) http.Handler {
 			next.ServeHTTP(&httpResponse, r)
 
 			end := time.Since(start).Seconds()
+			// use path params patterns rather than actual value to avoid
+			// generating too many different values for path label
+			path := chi.RouteContext(r.Context()).RoutePattern()
+
 			requestDurationHistogram.
-				WithLabelValues(httpResponse.status, r.Method, r.URL.Path).
+				WithLabelValues(httpResponse.status, r.Method, path).
 				Observe(end)
 			requestDurationSummary.
-				WithLabelValues(httpResponse.status, r.Method, r.URL.Path).
+				WithLabelValues(httpResponse.status, r.Method, path).
 				Observe(end)
 		})
 	}
