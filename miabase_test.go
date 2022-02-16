@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,12 +21,12 @@ const (
 
 func TestMiaBase(t *testing.T) {
 	t.Run("Add route to plugin", func(t *testing.T) {
-		s := NewService("", "", logLevel)
+		s := NewService(ServiceOpts{LogLevel: logLevel})
 		// Add test handler
 		message := map[string]interface{}{"message": "welcome"}
 
 		plugin := NewPlugin("/")
-		plugin.AddRoute("GET", "/greet", func(rw http.ResponseWriter, r *http.Request) {
+		plugin.AddRoute(http.MethodGet, "/greet", func(rw http.ResponseWriter, r *http.Request) {
 			rw.Header().Set("Content-Type", "application/json")
 			response.JSON(rw, message)
 		})
@@ -46,10 +47,10 @@ func TestMiaBase(t *testing.T) {
 // is able to handle panics returning Internal Server Error
 func TestPanicHandler(t *testing.T) {
 	t.Run("Handle panic correctly", func(t *testing.T) {
-		s := NewService("", "", logLevel)
+		s := NewService(ServiceOpts{LogLevel: logLevel})
 
 		plugin := NewPlugin("/")
-		plugin.AddRoute("GET", "/panic", func(rw http.ResponseWriter, r *http.Request) {
+		plugin.AddRoute(http.MethodGet, "/panic", func(rw http.ResponseWriter, r *http.Request) {
 			panic("it should not die")
 		})
 
@@ -74,7 +75,7 @@ func TestPanicHandler(t *testing.T) {
 // TestServiceStart verifies that the bare bone service
 // is able to start and to terminate gracefully
 func TestServiceStart(t *testing.T) {
-	s := NewService("test-service", "v0.0.1", logLevel)
+	s := NewService(ServiceOpts{"test-service", "v0.0.1", logLevel, nil, nil})
 
 	go func() {
 		time.Sleep(300 * time.Millisecond)
@@ -84,18 +85,16 @@ func TestServiceStart(t *testing.T) {
 	s.Start(httpPort)
 
 	statusRoutes := []string{"healthz", "ready", "check-up"}
-	expectedResponse := `{"name":"test-service","version":"v0.0.1","status":"OK"}
-`
+	expectedResponse := `{"name":"test-service","version":"v0.0.1","status":"OK"}`
 
 	for _, route := range statusRoutes {
 		t.Run(fmt.Sprintf("Test route %s", route), func(t *testing.T) {
 			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("/-/%s", route), nil)
 
-			response := httptest.NewRecorder()
-			s.router.ServeHTTP(response, req)
+			response := executeRequest(t, req, s)
 
 			require.Equal(t, http.StatusOK, response.Code, "Status codes mismatch")
-			require.Equal(t, expectedResponse, response.Body.String(), "Status codes mismatch")
+			require.Equal(t, expectedResponse, strings.TrimSpace(response.Body.String()), "Status codes mismatch")
 		})
 	}
 }

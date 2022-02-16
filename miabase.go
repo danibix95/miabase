@@ -9,26 +9,43 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/danibix95/miabase/pkg/handlers"
+	"github.com/danibix95/miabase/pkg/metrics"
 	"github.com/danibix95/miabase/pkg/response"
+	"github.com/danibix95/miabase/pkg/status"
 	"github.com/danibix95/zeropino"
 	zpstd "github.com/danibix95/zeropino/middlewares/std"
 	"github.com/go-chi/chi/v5"
 	"github.com/mia-platform/configlib"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 )
 
 type Service struct {
-	Name           string
-	Version        string
-	router         *chi.Mux
-	plugins        []*Plugin
-	Logger         *zerolog.Logger
-	HealthHandler  http.HandlerFunc
-	ReadyHandler   http.HandlerFunc
-	CheckupHandler http.HandlerFunc
-	signalReceiver chan os.Signal
+	name            string
+	version         string
+	router          *chi.Mux
+	plugins         []*Plugin
+	statusManager   status.Status
+	signalReceiver  chan os.Signal
+	metricsRegistry *prometheus.Registry
+	metricsFactory  promauto.Factory
+	// Logger a zerolog instance that can be employed to log service details within plugins
+	Logger *zerolog.Logger
+}
+
+type ServiceOpts struct {
+	// Name represents the designation emplyoyed to indentify the service's deploy
+	Name string
+	// Version is a semver string that represents the current version of deployed service
+	Version string
+	// LogLevel is a string indicating the minimum log level that is shown on the standard out
+	LogLevel string
+	// StatusManager is an interface providing the three status routes handlers
+	StatusManager status.Status
+	// MetricsManager is an interface providing a method to register custom metrics in the service registry
+	MetricsManager metrics.Metrics
 }
 
 func LoadEnv(c []configlib.EnvConfig, env interface{}) {
@@ -37,23 +54,35 @@ func LoadEnv(c []configlib.EnvConfig, env interface{}) {
 	}
 }
 
-func NewService(name, version, logLevel string) *Service {
+func NewService(opts ServiceOpts) *Service {
 	s := new(Service)
 	s.router = chi.NewRouter()
-	s.Name = name
-	s.Version = version
+	s.name = opts.Name
+	s.version = opts.Version
 
-	logger, err := zeropino.Init(zeropino.InitOptions{Level: logLevel})
+	logger, err := zeropino.Init(zeropino.InitOptions{Level: opts.LogLevel})
 	if err != nil {
 		panic(err.Error())
 	}
 	s.Logger = logger
+
+	if opts.StatusManager == nil {
+		s.statusManager = status.DefaultStatus{}
+	} else {
+		s.statusManager = opts.StatusManager
+	}
+
+	s.metricsRegistry, s.metricsFactory = metrics.InitializeMetrics(true)
+	if opts.MetricsManager != nil {
+		opts.MetricsManager.Register(s.metricsFactory)
+	}
 
 	s.signalReceiver = make(chan os.Signal, 1)
 
 	return s
 }
 
+// Register include the new plugin into the set of plugins that the service must load.
 func (s *Service) Register(plugin *Plugin) {
 	s.plugins = append(s.plugins, plugin)
 }
@@ -62,7 +91,7 @@ func (s *Service) Register(plugin *Plugin) {
 // mounting customized plugin and starting the webserver
 func (s *Service) Start(httpPort int) {
 	s.addErrorsHandlers()
-
+	s.router.Use(metrics.RequestStatus(s.metricsFactory))
 	s.addStatusRoutes()
 
 	s.router.Group(func(r chi.Router) {
@@ -92,25 +121,11 @@ func (s *Service) addStatusRoutes() {
 	s.router.Group(func(r chi.Router) {
 		statusAndMetricsRouter := chi.NewRouter()
 
-		if s.HealthHandler != nil {
-			statusAndMetricsRouter.Get("/healthz", s.HealthHandler)
-		} else {
-			statusAndMetricsRouter.Get("/healthz", handlers.Health(s.Name, s.Version))
-		}
+		statusAndMetricsRouter.Get("/healthz", s.statusManager.Health(s.name, s.version))
+		statusAndMetricsRouter.Get("/ready", s.statusManager.Ready(s.name, s.version))
+		statusAndMetricsRouter.Get("/check-up", s.statusManager.CheckUp(s.name, s.version))
 
-		if s.ReadyHandler != nil {
-			statusAndMetricsRouter.Get("/ready", s.ReadyHandler)
-		} else {
-			statusAndMetricsRouter.Get("/ready", handlers.Ready(s.Name, s.Version))
-		}
-
-		if s.CheckupHandler != nil {
-			statusAndMetricsRouter.Get("/check-up", s.CheckupHandler)
-		} else {
-			statusAndMetricsRouter.Get("/check-up", handlers.CheckUp(s.Name, s.Version))
-		}
-
-		statusAndMetricsRouter.Handle("/metrics", promhttp.Handler())
+		statusAndMetricsRouter.Handle("/metrics", promhttp.HandlerFor(s.metricsRegistry, promhttp.HandlerOpts{}))
 
 		r.Mount("/-/", statusAndMetricsRouter)
 	})
