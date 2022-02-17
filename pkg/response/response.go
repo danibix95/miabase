@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// JSON is a convenient function to write a JSON object as response to the incoming request
 func JSON(w http.ResponseWriter, body interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 

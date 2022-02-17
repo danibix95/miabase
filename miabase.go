@@ -22,6 +22,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Service is the main structure that contains all the service details,
+// the methods to attach custom plugins and the ones to start it
 type Service struct {
 	name            string
 	version         string
@@ -35,6 +37,7 @@ type Service struct {
 	Logger *zerolog.Logger
 }
 
+// ServiceOpts defines which options are needed to customize a Service initialization
 type ServiceOpts struct {
 	// Name represents the designation emplyoyed to indentify the service's deploy
 	Name string
@@ -54,6 +57,8 @@ func LoadEnv(c []configlib.EnvConfig, env interface{}) {
 	}
 }
 
+// NewService instantiate a Service which can be employed to connect custom plugin
+// and start listening on defined endpoints
 func NewService(opts ServiceOpts) *Service {
 	s := new(Service)
 	s.router = chi.NewRouter()
@@ -107,6 +112,7 @@ func (s *Service) Start(httpPort int) {
 	runWithGracefulShutdown(server, s.Logger, s.signalReceiver)
 }
 
+// Stop terminates service webserver execution
 func (s *Service) Stop() {
 	s.signalReceiver <- syscall.SIGTERM
 }

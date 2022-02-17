@@ -21,6 +21,8 @@ var (
 	requestDurationSummary   *prometheus.SummaryVec
 )
 
+// Metrics is an interface that can be employed when using the service to
+//  define custom metrics that developer can add throughout the service
 type Metrics interface {
 	// Register provides a prometheus factory that can be employed to add custom metrics to the service
 	Register(pf promauto.Factory)
@@ -39,7 +41,7 @@ func InitializeMetrics(enableDefaultCollectors bool) (*prometheus.Registry, prom
 	return reg, promauto.With(reg)
 }
 
-// SetRequestMetrics register a set of metrics usefult to monitor the requests that are performed to the service
+// setRequestMetrics register a set of metrics usefult to monitor the requests that are performed to the service
 func setRequestMetrics(pf promauto.Factory) {
 	requestDurationHistogram = pf.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -59,6 +61,8 @@ func setRequestMetrics(pf promauto.Factory) {
 	)
 }
 
+// RequestStatus return a http middleware that collects all the incoming http requests
+// and categorize them accoding to their route and response status code
 func RequestStatus(pf promauto.Factory) func(http.Handler) http.Handler {
 	setRequestMetrics(pf)
 
