@@ -6,7 +6,7 @@ require (
 	github.com/danibix95/zeropino v0.3.1
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/mia-platform/configlib v1.0.0
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.12.2
 	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.7.1
 )
