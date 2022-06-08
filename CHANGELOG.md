@@ -6,8 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.0] 2022-06-08
 
-## v0.1.0
+### Added
+
+- default metrics
+- custom metrics handling
+
+### Changed
+
+- status routes
+- service interface
+- updated dependencies
+
+## [v0.1.0] 2021-10-14
 
 ### Initial release
 
