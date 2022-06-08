@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.2.2] 2022-06-08
+
+### Added
+
+- new Inject method to test plugin endpoints
+
 ## [v0.2.1] 2022-06-08
 
 ### Added
