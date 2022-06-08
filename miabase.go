@@ -95,6 +95,26 @@ func (s *Service) Register(plugin *Plugin) {
 // Start launch the configured service,
 // mounting customized plugin and starting the webserver
 func (s *Service) Start(httpPort int) {
+	s.setupServicePlugins()
+
+	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", httpPort), Handler: s.router}
+
+	runWithGracefulShutdown(server, s.Logger, s.signalReceiver)
+}
+
+// Stop terminates service webserver execution
+func (s *Service) Stop() {
+	s.signalReceiver <- syscall.SIGTERM
+}
+
+// Inject allows to test an endpoint by passing a request and response recorder
+func (s *Service) Inject(w http.ResponseWriter, r *http.Request) {
+	s.setupServicePlugins()
+
+	s.router.ServeHTTP(w, r)
+}
+
+func (s *Service) setupServicePlugins() {
 	s.addErrorsHandlers()
 	s.router.Use(metrics.RequestStatus(s.metricsFactory))
 	s.addStatusRoutes()
@@ -106,15 +126,6 @@ func (s *Service) Start(httpPort int) {
 			r.Mount(plugin.Path, plugin.router)
 		}
 	})
-
-	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", httpPort), Handler: s.router}
-
-	runWithGracefulShutdown(server, s.Logger, s.signalReceiver)
-}
-
-// Stop terminates service webserver execution
-func (s *Service) Stop() {
-	s.signalReceiver <- syscall.SIGTERM
 }
 
 func (s *Service) addErrorsHandlers() {
