@@ -8,7 +8,7 @@ require (
 	github.com/mia-platform/configlib v1.0.0
 	github.com/prometheus/client_golang v1.12.2
 	github.com/rs/zerolog v1.29.1
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 )
 
 require (
