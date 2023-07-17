@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/danibix95/zeropino v0.3.1
-	github.com/go-chi/chi/v5 v5.0.8
+	github.com/go-chi/chi/v5 v5.0.10
 	github.com/mia-platform/configlib v1.0.0
 	github.com/prometheus/client_golang v1.12.2
 	github.com/rs/zerolog v1.29.1
